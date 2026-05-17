@@ -1,0 +1,403 @@
+### Variables
+@baseUrl = http://localhost:8080/api
+
+@userEmail = ivan@example.com
+@technicianEmail = serhii.tech@example.com
+@password = password123
+
+
+### 1. Login as USER
+# @name loginUser
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{userEmail}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.test("USER login returns 200", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("USER token exists", function () {
+        client.assert(response.body.token, "Token is missing");
+    });
+
+    client.global.set("userToken", response.body.token);
+    client.global.set("userId", response.body.user.id);
+%}
+
+
+### 2. Login as TECHNICIAN
+# @name loginTechnician
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{technicianEmail}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.test("TECHNICIAN login returns 200", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("TECHNICIAN token exists", function () {
+        client.assert(response.body.token, "Token is missing");
+    });
+
+    client.global.set("technicianToken", response.body.token);
+    client.global.set("technicianId", response.body.user.id);
+%}
+
+
+### 3. USER creates repair request
+# @name createRequest
+POST {{baseUrl}}/requests
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "equipmentType": "PRINTER",
+  "equipmentName": "HP LaserJet",
+  "title": "E2E: Принтер не друкує",
+  "problemDescription": "Після запуску друку принтер не реагує",
+  "userComment": "Проблема зʼявилась після заміни картриджа",
+  "priority": "MEDIUM"
+}
+
+> {%
+    client.test("Create request returns 201", function () {
+        client.assert(response.status === 201, "Expected 201 Created");
+    });
+
+    client.test("Created request has CREATED status", function () {
+        client.assert(response.body.status === "CREATED", "Expected CREATED status");
+    });
+
+    client.test("Created request has no technician", function () {
+        client.assert(response.body.technicianId === null, "Expected technicianId null");
+    });
+
+    client.global.set("requestId", response.body.id);
+%}
+
+
+### 4. USER gets own requests
+GET {{baseUrl}}/requests/my
+Authorization: Bearer {{userToken}}
+
+> {%
+    client.test("Get my requests returns 200", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("My requests is array", function () {
+        client.assert(Array.isArray(response.body), "Expected array");
+    });
+%}
+
+
+### 5. USER gets request details
+GET {{baseUrl}}/requests/{{requestId}}
+Authorization: Bearer {{userToken}}
+
+> {%
+    client.test("User gets request details", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("Details id matches created request", function () {
+        client.assert(response.body.id == client.global.get("requestId"), "Wrong request id");
+    });
+%}
+
+
+### 6. USER updates comment
+PATCH {{baseUrl}}/requests/{{requestId}}/user-comment
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "userComment": "E2E: проблема повторилась після перезапуску"
+}
+
+> {%
+    client.test("User comment update returns 200", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("User comment updated", function () {
+        client.assert(response.body.userComment === "E2E: проблема повторилась після перезапуску", "Comment was not updated");
+    });
+%}
+
+
+### 7. TECHNICIAN gets all requests
+GET {{baseUrl}}/technician/requests
+Authorization: Bearer {{technicianToken}}
+
+> {%
+    client.test("Technician gets all requests", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("Technician requests is array", function () {
+        client.assert(Array.isArray(response.body), "Expected array");
+    });
+%}
+
+
+### 8. USER cannot access technician requests
+GET {{baseUrl}}/technician/requests
+Authorization: Bearer {{userToken}}
+
+> {%
+    client.test("User cannot access technician endpoint", function () {
+        client.assert(response.status === 403, "Expected 403 Forbidden");
+    });
+%}
+
+
+### 9. TECHNICIAN gets request details
+GET {{baseUrl}}/requests/{{requestId}}
+Authorization: Bearer {{technicianToken}}
+
+> {%
+    client.test("Technician can view request details", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+%}
+
+
+### 10. TECHNICIAN takes request
+PATCH {{baseUrl}}/technician/requests/{{requestId}}/take
+Authorization: Bearer {{technicianToken}}
+
+> {%
+    client.test("Technician takes request", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("Request status becomes IN_PROGRESS", function () {
+        client.assert(response.body.status === "IN_PROGRESS", "Expected IN_PROGRESS");
+    });
+
+    client.test("Technician id is set", function () {
+        client.assert(response.body.technicianId == client.global.get("technicianId"), "Wrong technician id");
+    });
+%}
+
+
+### 11. TECHNICIAN cannot take already taken request
+PATCH {{baseUrl}}/technician/requests/{{requestId}}/take
+Authorization: Bearer {{technicianToken}}
+
+> {%
+    client.test("Cannot take already taken request", function () {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+
+### 12. TECHNICIAN changes status to WAITING_FOR_USER
+PATCH {{baseUrl}}/technician/requests/{{requestId}}/status
+Authorization: Bearer {{technicianToken}}
+Content-Type: application/json
+
+{
+  "status": "WAITING_FOR_USER"
+}
+
+> {%
+    client.test("Technician changes status", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("Status is WAITING_FOR_USER", function () {
+        client.assert(response.body.status === "WAITING_FOR_USER", "Expected WAITING_FOR_USER");
+    });
+%}
+
+
+### 13. TECHNICIAN cannot set COMPLETED through status endpoint
+PATCH {{baseUrl}}/technician/requests/{{requestId}}/status
+Authorization: Bearer {{technicianToken}}
+Content-Type: application/json
+
+{
+  "status": "COMPLETED"
+}
+
+> {%
+    client.test("Cannot set COMPLETED through status endpoint", function () {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+
+### 14. TECHNICIAN updates comment
+PATCH {{baseUrl}}/technician/requests/{{requestId}}/technician-comment
+Authorization: Bearer {{technicianToken}}
+Content-Type: application/json
+
+{
+  "technicianComment": "E2E: потрібна перевірка кабелю живлення"
+}
+
+> {%
+    client.test("Technician comment update returns 200", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("Technician comment updated", function () {
+        client.assert(response.body.technicianComment === "E2E: потрібна перевірка кабелю живлення", "Technician comment was not updated");
+    });
+%}
+
+
+### 15. TECHNICIAN cannot close without repair result
+PATCH {{baseUrl}}/technician/requests/{{requestId}}/close
+Authorization: Bearer {{technicianToken}}
+Content-Type: application/json
+
+{
+  "repairResult": ""
+}
+
+> {%
+    client.test("Cannot close without repair result", function () {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+
+### 16. TECHNICIAN adds repair result
+PATCH {{baseUrl}}/technician/requests/{{requestId}}/repair-result
+Authorization: Bearer {{technicianToken}}
+Content-Type: application/json
+
+{
+  "repairResult": "E2E: замінено кабель живлення, обладнання працює стабільно"
+}
+
+> {%
+    client.test("Repair result update returns 200", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("Repair result updated", function () {
+        client.assert(response.body.repairResult === "E2E: замінено кабель живлення, обладнання працює стабільно", "Repair result was not updated");
+    });
+%}
+
+
+### 17. TECHNICIAN closes request
+PATCH {{baseUrl}}/technician/requests/{{requestId}}/close
+Authorization: Bearer {{technicianToken}}
+Content-Type: application/json
+
+{
+  "repairResult": "E2E: замінено кабель живлення, обладнання працює стабільно"
+}
+
+> {%
+    client.test("Technician closes request", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("Status is COMPLETED", function () {
+        client.assert(response.body.status === "COMPLETED", "Expected COMPLETED");
+    });
+
+    client.test("ClosedAt exists", function () {
+        client.assert(response.body.closedAt, "closedAt is missing");
+    });
+%}
+
+
+### 18. USER cannot cancel completed request
+PATCH {{baseUrl}}/requests/{{requestId}}/cancel
+Authorization: Bearer {{userToken}}
+
+> {%
+    client.test("User cannot cancel completed request", function () {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+
+### 19. USER creates second request for cancel flow
+# @name createRequestForCancel
+POST {{baseUrl}}/requests
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "equipmentType": "OTHER",
+  "equipmentName": "Сканер Canon",
+  "title": "E2E: Сканер не працює",
+  "problemDescription": "Сканер не визначається системою",
+  "userComment": "Потрібно перевірити USB підключення",
+  "priority": "LOW"
+}
+
+> {%
+    client.test("Create second request returns 201", function () {
+        client.assert(response.status === 201, "Expected 201 Created");
+    });
+
+    client.global.set("cancelRequestId", response.body.id);
+%}
+
+
+### 20. USER cancels second request
+PATCH {{baseUrl}}/requests/{{cancelRequestId}}/cancel
+Authorization: Bearer {{userToken}}
+
+> {%
+    client.test("User cancels own request", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+
+    client.test("Status is CANCELLED", function () {
+        client.assert(response.body.status === "CANCELLED", "Expected CANCELLED");
+    });
+
+    client.test("CancelledAt exists", function () {
+        client.assert(response.body.cancelledAt, "cancelledAt is missing");
+    });
+%}
+
+
+### 21. Validation: OTHER equipment requires equipmentName
+POST {{baseUrl}}/requests
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "equipmentType": "OTHER",
+  "equipmentName": "",
+  "title": "E2E: Інше обладнання",
+  "problemDescription": "Опис проблеми",
+  "priority": "MEDIUM"
+}
+
+> {%
+    client.test("OTHER without equipmentName fails", function () {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+
+### 22. Validation: unauthenticated request fails
+GET {{baseUrl}}/requests/my
+
+> {%
+    client.test("Unauthenticated request fails", function () {
+        client.assert(response.status === 401, "Expected 401 Unauthorized");
+    });
+%}

@@ -1,9 +1,9 @@
 INSERT INTO users (full_name, email, password_hash, role, is_active)
 VALUES
-    ('Ivan Petrenko', 'ivan.petrenko@example.com', '$2a$10$ivan.petrenko.hash', 'USER', TRUE),
-    ('Olena Shevchenko', 'olena.shevchenko@example.com', '$2a$10$olena.shevchenko.hash', 'USER', TRUE),
-    ('Taras Bondarenko', 'taras.bondarenko@example.com', '$2a$10$taras.bondarenko.hash', 'TECHNICIAN', TRUE),
-    ('Svitlana Melnyk', 'svitlana.melnyk@example.com', '$2a$10$svitlana.melnyk.hash', 'TECHNICIAN', TRUE);
+    ('Ivan Petrenko', 'ivan@example.com', '$2a$10$8C6z10WTmWTFcVrJ4fanmO105xgexLMMazyjTKEwzw7yBkZYbulDS', 'USER', TRUE),
+    ('Olena Shevchenko', 'olena.shevchenko@example.com', '$2a$10$8C6z10WTmWTFcVrJ4fanmO105xgexLMMazyjTKEwzw7yBkZYbulDS', 'USER', TRUE),
+    ('Serhii Technician', 'serhii.tech@example.com', '$2a$10$8C6z10WTmWTFcVrJ4fanmO105xgexLMMazyjTKEwzw7yBkZYbulDS', 'TECHNICIAN', TRUE),
+    ('Svitlana Melnyk', 'svitlana.melnyk@example.com', '$2a$10$8C6z10WTmWTFcVrJ4fanmO105xgexLMMazyjTKEwzw7yBkZYbulDS', 'TECHNICIAN', TRUE);
 
 INSERT INTO repair_requests (
     user_id,
@@ -24,7 +24,7 @@ INSERT INTO repair_requests (
 )
 VALUES
     (
-        (SELECT id FROM users WHERE email = 'ivan.petrenko@example.com'),
+        (SELECT id FROM users WHERE email = 'ivan@example.com'),
         NULL,
         'PRINTER',
         'HP LaserJet Pro M404',
@@ -42,7 +42,7 @@ VALUES
     ),
     (
         (SELECT id FROM users WHERE email = 'olena.shevchenko@example.com'),
-        (SELECT id FROM users WHERE email = 'taras.bondarenko@example.com'),
+        (SELECT id FROM users WHERE email = 'serhii.tech@example.com'),
         'LAPTOP',
         'Dell Latitude 5520',
         'Laptop overheats during work',
@@ -58,7 +58,7 @@ VALUES
         NULL
     ),
     (
-        (SELECT id FROM users WHERE email = 'ivan.petrenko@example.com'),
+        (SELECT id FROM users WHERE email = 'ivan@example.com'),
         (SELECT id FROM users WHERE email = 'svitlana.melnyk@example.com'),
         'ROUTER',
         'MikroTik hAP ac2',
@@ -76,7 +76,7 @@ VALUES
     ),
     (
         (SELECT id FROM users WHERE email = 'olena.shevchenko@example.com'),
-        (SELECT id FROM users WHERE email = 'taras.bondarenko@example.com'),
+        (SELECT id FROM users WHERE email = 'serhii.tech@example.com'),
         'COMPUTER',
         'Lenovo ThinkCentre M720',
         'System unit does not start',
@@ -92,7 +92,7 @@ VALUES
         CURRENT_TIMESTAMP - INTERVAL '6 days'
     ),
     (
-        (SELECT id FROM users WHERE email = 'ivan.petrenko@example.com'),
+        (SELECT id FROM users WHERE email = 'ivan@example.com'),
         (SELECT id FROM users WHERE email = 'svitlana.melnyk@example.com'),
         'OTHER',
         'Document camera',
