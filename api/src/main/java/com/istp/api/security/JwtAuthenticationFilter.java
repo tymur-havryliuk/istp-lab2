@@ -39,21 +39,37 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String email = jwtService.extractEmail(token);
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                AppUserPrincipal principal = (AppUserPrincipal) userDetailsService.loadUserByUsername(email);
-                if (jwtService.isValid(token, principal) && principal.isEnabled()) {
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            principal,
-                            null,
-                            principal.getAuthorities()
-                    );
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+                AppUserPrincipal principal = getPrincipal(token, email);
+                setAuthenticationIfValid(request, token, principal);
             }
         } catch (JwtException | UsernameNotFoundException ignored) {
             SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private AppUserPrincipal getPrincipal(String token, String email) {
+        if (jwtService.isTestToken(token)) {
+            return AppUserPrincipal.testTokenUser(
+                    jwtService.extractUserId(token),
+                    email,
+                    jwtService.extractRole(token)
+            );
+        }
+        return (AppUserPrincipal) userDetailsService.loadUserByUsername(email);
+    }
+
+    private void setAuthenticationIfValid(HttpServletRequest request, String token, AppUserPrincipal principal) {
+        if (!jwtService.isValid(token, principal) || !principal.isEnabled()) {
+            return;
+        }
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                principal,
+                null,
+                principal.getAuthorities()
+        );
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }

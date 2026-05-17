@@ -27,6 +27,10 @@ public class AppUserPrincipal implements UserDetails, AuthenticatedUser {
         );
     }
 
+    public static AppUserPrincipal testTokenUser(Long id, String email, UserRole role) {
+        return new AppUserPrincipal(id, email, "", role, true);
+    }
+
     @Override
     public Long id() {
         return id;

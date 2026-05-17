@@ -1,27 +1,58 @@
 ### Variables
 @baseUrl = http://localhost:8080/api
 
-@userEmail = ivan@example.com
-@technicianEmail = serhii.tech@example.com
+@runId = {{$timestamp}}
+@registeredUserEmail = e2e.user.{{runId}}@example.com
+@registeredUserFullName = E2E Registered User
+@testTechnicianEmail = e2e.tech.{{runId}}@example.com
 @password = password123
 
 
-### 1. Login as USER
-# @name loginUser
-POST {{baseUrl}}/auth/login
+### 1. Register public USER account
+# @name registerUser
+POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "email": "{{userEmail}}",
+  "fullName": "{{registeredUserFullName}}",
+  "email": "{{registeredUserEmail}}",
   "password": "{{password}}"
 }
 
 > {%
-    client.test("USER login returns 200", function () {
+    client.test("Register returns 201", function () {
+        client.assert(response.status === 201, "Expected 201 Created");
+    });
+
+    client.test("Registered user has USER role", function () {
+        client.assert(response.body.user.role === "USER", "Expected USER role");
+    });
+
+    client.test("Registration returns JWT", function () {
+        client.assert(response.body.token, "Token is missing");
+    });
+
+    client.global.set("registeredUserId", response.body.user.id);
+    client.global.set("registeredUserToken", response.body.token);
+%}
+
+
+### 2. Registered USER can login
+# @name loginRegisteredUser
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{registeredUserEmail}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.test("Registered USER login returns 200", function () {
         client.assert(response.status === 200, "Expected 200 OK");
     });
 
-    client.test("USER token exists", function () {
+    client.test("Registered USER token exists", function () {
         client.assert(response.body.token, "Token is missing");
     });
 
@@ -30,23 +61,27 @@ Content-Type: application/json
 %}
 
 
-### 2. Login as TECHNICIAN
-# @name loginTechnician
-POST {{baseUrl}}/auth/login
+### 3. [TEST ONLY] Generate TECHNICIAN JWT for Swagger/manual testing
+# @name createTestTechnicianToken
+POST {{baseUrl}}/auth/test-token
 Content-Type: application/json
 
 {
-  "email": "{{technicianEmail}}",
-  "password": "{{password}}"
+  "email": "{{testTechnicianEmail}}",
+  "role": "TECHNICIAN"
 }
 
 > {%
-    client.test("TECHNICIAN login returns 200", function () {
+    client.test("TEST ONLY token endpoint returns 200", function () {
         client.assert(response.status === 200, "Expected 200 OK");
     });
 
-    client.test("TECHNICIAN token exists", function () {
+    client.test("TEST ONLY TECHNICIAN token exists", function () {
         client.assert(response.body.token, "Token is missing");
+    });
+
+    client.test("TEST ONLY user has TECHNICIAN role", function () {
+        client.assert(response.body.user.role === "TECHNICIAN", "Expected TECHNICIAN role");
     });
 
     client.global.set("technicianToken", response.body.token);
@@ -54,7 +89,7 @@ Content-Type: application/json
 %}
 
 
-### 3. USER creates repair request
+### 4. USER creates repair request
 # @name createRequest
 POST {{baseUrl}}/requests
 Authorization: Bearer {{userToken}}
@@ -86,7 +121,7 @@ Content-Type: application/json
 %}
 
 
-### 4. USER gets own requests
+### 5. USER gets own requests
 GET {{baseUrl}}/requests/my
 Authorization: Bearer {{userToken}}
 
@@ -101,7 +136,7 @@ Authorization: Bearer {{userToken}}
 %}
 
 
-### 5. USER gets request details
+### 6. USER gets request details
 GET {{baseUrl}}/requests/{{requestId}}
 Authorization: Bearer {{userToken}}
 
@@ -116,7 +151,7 @@ Authorization: Bearer {{userToken}}
 %}
 
 
-### 6. USER updates comment
+### 7. USER updates comment
 PATCH {{baseUrl}}/requests/{{requestId}}/user-comment
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -136,12 +171,12 @@ Content-Type: application/json
 %}
 
 
-### 7. TECHNICIAN gets all requests
+### 8. TEST ONLY TECHNICIAN token gets all requests
 GET {{baseUrl}}/technician/requests
 Authorization: Bearer {{technicianToken}}
 
 > {%
-    client.test("Technician gets all requests", function () {
+    client.test("TEST ONLY technician token gets all requests", function () {
         client.assert(response.status === 200, "Expected 200 OK");
     });
 
@@ -151,7 +186,7 @@ Authorization: Bearer {{technicianToken}}
 %}
 
 
-### 8. USER cannot access technician requests
+### 9. USER cannot access technician requests
 GET {{baseUrl}}/technician/requests
 Authorization: Bearer {{userToken}}
 
@@ -162,23 +197,23 @@ Authorization: Bearer {{userToken}}
 %}
 
 
-### 9. TECHNICIAN gets request details
+### 10. TEST ONLY TECHNICIAN gets request details
 GET {{baseUrl}}/requests/{{requestId}}
 Authorization: Bearer {{technicianToken}}
 
 > {%
-    client.test("Technician can view request details", function () {
+    client.test("TEST ONLY technician can view request details", function () {
         client.assert(response.status === 200, "Expected 200 OK");
     });
 %}
 
 
-### 10. TECHNICIAN takes request
+### 11. TEST ONLY TECHNICIAN takes request
 PATCH {{baseUrl}}/technician/requests/{{requestId}}/take
 Authorization: Bearer {{technicianToken}}
 
 > {%
-    client.test("Technician takes request", function () {
+    client.test("TEST ONLY technician takes request", function () {
         client.assert(response.status === 200, "Expected 200 OK");
     });
 
@@ -192,7 +227,7 @@ Authorization: Bearer {{technicianToken}}
 %}
 
 
-### 11. TECHNICIAN cannot take already taken request
+### 12. TEST ONLY TECHNICIAN cannot take already taken request
 PATCH {{baseUrl}}/technician/requests/{{requestId}}/take
 Authorization: Bearer {{technicianToken}}
 
@@ -203,7 +238,7 @@ Authorization: Bearer {{technicianToken}}
 %}
 
 
-### 12. TECHNICIAN changes status to WAITING_FOR_USER
+### 13. TEST ONLY TECHNICIAN changes status to WAITING_FOR_USER
 PATCH {{baseUrl}}/technician/requests/{{requestId}}/status
 Authorization: Bearer {{technicianToken}}
 Content-Type: application/json
@@ -213,7 +248,7 @@ Content-Type: application/json
 }
 
 > {%
-    client.test("Technician changes status", function () {
+    client.test("TEST ONLY technician changes status", function () {
         client.assert(response.status === 200, "Expected 200 OK");
     });
 
@@ -223,7 +258,7 @@ Content-Type: application/json
 %}
 
 
-### 13. TECHNICIAN cannot set COMPLETED through status endpoint
+### 14. TEST ONLY TECHNICIAN cannot set COMPLETED through status endpoint
 PATCH {{baseUrl}}/technician/requests/{{requestId}}/status
 Authorization: Bearer {{technicianToken}}
 Content-Type: application/json
@@ -239,7 +274,7 @@ Content-Type: application/json
 %}
 
 
-### 14. TECHNICIAN updates comment
+### 15. TEST ONLY TECHNICIAN updates comment
 PATCH {{baseUrl}}/technician/requests/{{requestId}}/technician-comment
 Authorization: Bearer {{technicianToken}}
 Content-Type: application/json
@@ -249,7 +284,7 @@ Content-Type: application/json
 }
 
 > {%
-    client.test("Technician comment update returns 200", function () {
+    client.test("TEST ONLY technician comment update returns 200", function () {
         client.assert(response.status === 200, "Expected 200 OK");
     });
 
@@ -259,7 +294,7 @@ Content-Type: application/json
 %}
 
 
-### 15. TECHNICIAN cannot close without repair result
+### 16. TEST ONLY TECHNICIAN cannot close without repair result
 PATCH {{baseUrl}}/technician/requests/{{requestId}}/close
 Authorization: Bearer {{technicianToken}}
 Content-Type: application/json
@@ -275,7 +310,7 @@ Content-Type: application/json
 %}
 
 
-### 16. TECHNICIAN adds repair result
+### 17. TEST ONLY TECHNICIAN adds repair result
 PATCH {{baseUrl}}/technician/requests/{{requestId}}/repair-result
 Authorization: Bearer {{technicianToken}}
 Content-Type: application/json
@@ -295,7 +330,7 @@ Content-Type: application/json
 %}
 
 
-### 17. TECHNICIAN closes request
+### 18. TEST ONLY TECHNICIAN closes request
 PATCH {{baseUrl}}/technician/requests/{{requestId}}/close
 Authorization: Bearer {{technicianToken}}
 Content-Type: application/json
@@ -305,7 +340,7 @@ Content-Type: application/json
 }
 
 > {%
-    client.test("Technician closes request", function () {
+    client.test("TEST ONLY technician closes request", function () {
         client.assert(response.status === 200, "Expected 200 OK");
     });
 
@@ -319,7 +354,7 @@ Content-Type: application/json
 %}
 
 
-### 18. USER cannot cancel completed request
+### 19. USER cannot cancel completed request
 PATCH {{baseUrl}}/requests/{{requestId}}/cancel
 Authorization: Bearer {{userToken}}
 
@@ -330,7 +365,7 @@ Authorization: Bearer {{userToken}}
 %}
 
 
-### 19. USER creates second request for cancel flow
+### 20. USER creates second request for cancel flow
 # @name createRequestForCancel
 POST {{baseUrl}}/requests
 Authorization: Bearer {{userToken}}
@@ -354,7 +389,7 @@ Content-Type: application/json
 %}
 
 
-### 20. USER cancels second request
+### 21. USER cancels second request
 PATCH {{baseUrl}}/requests/{{cancelRequestId}}/cancel
 Authorization: Bearer {{userToken}}
 
@@ -373,7 +408,24 @@ Authorization: Bearer {{userToken}}
 %}
 
 
-### 21. Validation: OTHER equipment requires equipmentName
+### 22. Validation: duplicate registration email fails
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "{{registeredUserFullName}}",
+  "email": "{{registeredUserEmail}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.test("Duplicate registration email fails", function () {
+        client.assert(response.status === 400, "Expected 400 Bad Request");
+    });
+%}
+
+
+### 23. Validation: OTHER equipment requires equipmentName
 POST {{baseUrl}}/requests
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -393,7 +445,7 @@ Content-Type: application/json
 %}
 
 
-### 22. Validation: unauthenticated request fails
+### 24. Validation: unauthenticated request fails
 GET {{baseUrl}}/requests/my
 
 > {%
